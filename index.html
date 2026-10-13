@@ -1,0 +1,1259 @@
+<title>PINN Lab</title>
+<meta name="description" content="Physics-informed neural networks, trained live in your browser by a from-scratch autodiff engine.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: lab-notebook graph paper. Nav bar, split hero (thesis + live spring stage), live results strip,
+   instrument panels for the two experiments, then method, applications and footer. */
+:root {
+  --paper: #EEF2F6;
+  --panel: #FFFFFF;
+  --ink: #142037;
+  --muted: #586880;
+  --line: #D3DCE6;
+  --grid: rgba(20, 32, 55, 0.07);
+  --pinn: #1C56C9;
+  --pinn-soft: rgba(28, 86, 201, 0.10);
+  --nn: #D4572B;
+  --nn-soft: rgba(212, 87, 43, 0.10);
+  --truth: #142037;
+  --shade: rgba(28, 86, 201, 0.07);
+  --good: #1D7F53;
+  --good-soft: rgba(29, 127, 83, 0.10);
+  --chip: #E3E9F0;
+  --on-accent: #FFFFFF;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0D1420; --panel: #141D2C; --ink: #E4EAF3; --muted: #92A0B6; --line: #26324A;
+    --grid: rgba(228, 234, 243, 0.06); --pinn: #74A3FF; --pinn-soft: rgba(116, 163, 255, 0.13);
+    --nn: #FF8A5E; --nn-soft: rgba(255, 138, 94, 0.13); --truth: #E4EAF3;
+    --shade: rgba(116, 163, 255, 0.09); --good: #5BD39A; --good-soft: rgba(91, 211, 154, 0.12);
+    --chip: #1C2738; --on-accent: #0D1420; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0D1420; --panel: #141D2C; --ink: #E4EAF3; --muted: #92A0B6; --line: #26324A;
+  --grid: rgba(228, 234, 243, 0.06); --pinn: #74A3FF; --pinn-soft: rgba(116, 163, 255, 0.13);
+  --nn: #FF8A5E; --nn-soft: rgba(255, 138, 94, 0.13); --truth: #E4EAF3;
+  --shade: rgba(116, 163, 255, 0.09); --good: #5BD39A; --good-soft: rgba(91, 211, 154, 0.12);
+  --chip: #1C2738; --on-accent: #0D1420; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+a { color: var(--pinn); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 0 48px; display: grid; gap: 36px; }
+@media (max-width: 520px) { .wrap { padding-inline: 16px; gap: 28px; } }
+
+/* ---------- nav ---------- */
+.nav {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding-block: 12px; margin-inline: -20px; padding-inline: 20px;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+@media (max-width: 520px) { .nav { margin-inline: -16px; padding-inline: 16px; } }
+.brand { display: flex; align-items: center; gap: 9px; font: 800 18px/1 var(--f-display); letter-spacing: -0.01em; color: var(--ink); text-decoration: none; }
+.brand svg { display: block; }
+.nav-links { display: flex; gap: 4px 18px; flex-wrap: wrap; margin-left: auto; font-size: 14px; }
+.nav-links a { color: var(--muted); text-decoration: none; font-weight: 500; }
+.nav-links a:hover { color: var(--ink); }
+@media (max-width: 640px) { .nav-links { display: none; } }
+
+/* ---------- hero ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 28px; align-items: center; padding-top: 16px; }
+@media (max-width: 900px) { .hero { grid-template-columns: minmax(0, 1fr); } }
+.hero-text { display: grid; gap: 16px; align-content: center; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(36px, 5.6vw, 60px); line-height: 1.0; letter-spacing: -0.025em; margin: 0; text-wrap: balance; }
+h1 em { font-style: normal; color: var(--pinn); }
+.lede { max-width: 58ch; margin: 0; color: var(--muted); font-size: 17px; }
+.lede strong { color: var(--ink); font-weight: 600; }
+.cta { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+.btn {
+  appearance: none; cursor: pointer; font: 600 14px/1 var(--f-body); border-radius: 5px; padding: 11px 16px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink); text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+  transition: transform .12s ease, filter .12s ease;
+}
+.btn.primary { background: var(--pinn); border-color: var(--pinn); color: var(--on-accent); }
+.btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.btn.sm { padding: 9px 13px; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag { font: 500 12px/1 var(--f-mono); padding: 6px 9px; border-radius: 99px; background: var(--chip); color: var(--ink); }
+
+.stage-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 10px; display: grid; gap: 8px; box-shadow: 0 1px 0 var(--line), 0 18px 40px -28px rgba(20, 32, 55, 0.45); min-width: 0; }
+.stage-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.stage-head b { font: 600 13px/1.2 var(--f-body); }
+.live { font: 500 11.5px/1 var(--f-mono); color: var(--good); display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0.06em; text-transform: uppercase; }
+.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.stage-note { font-size: 12.5px; color: var(--muted); margin: 0; }
+#stage { aspect-ratio: 5 / 4; }
+
+/* ---------- results strip ---------- */
+.strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+@media (max-width: 820px) { .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { padding: 16px 18px; display: grid; gap: 4px; border-left: 1px solid var(--line); min-width: 0; }
+.stat:first-child { border-left: 0; }
+@media (max-width: 820px) { .stat:nth-child(3) { border-left: 0; } .stat:nth-child(n+3) { border-top: 1px solid var(--line); } }
+.stat .k { font: 500 11.5px/1.2 var(--f-mono); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font: 700 30px/1.1 var(--f-display); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.stat .s { font-size: 12.5px; color: var(--muted); }
+
+/* ---------- section heads ---------- */
+.sec-head { display: grid; gap: 6px; }
+.sec-head h2 { font-family: var(--f-display); font-weight: 700; font-size: clamp(24px, 3.2vw, 30px); letter-spacing: -0.015em; margin: 0; text-wrap: balance; }
+.sec-head p { margin: 0; max-width: 70ch; color: var(--muted); }
+
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.tab {
+  appearance: none; border: 0; background: none; cursor: pointer; color: var(--muted);
+  font: 600 15px/1 var(--f-body); padding: 12px 14px 13px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  display: flex; gap: 8px; align-items: baseline;
+}
+.tab .n { font-family: var(--f-mono); font-weight: 500; font-size: 12px; }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--pinn); }
+.tab:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--pinn); outline-offset: 2px; }
+
+.experiments { display: grid; gap: 18px; scroll-margin-top: 70px; }
+.exp { display: grid; gap: 16px; }
+.exp-head { display: grid; gap: 6px; }
+.exp-head h3 { font-family: var(--f-display); font-weight: 700; font-size: 22px; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.exp-head p { margin: 0; max-width: 74ch; color: var(--muted); }
+.guide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 760px) { .guide { grid-template-columns: minmax(0, 1fr); } }
+.guide div { font-size: 13.5px; color: var(--muted); padding: 10px 12px; border-radius: 6px; background: var(--chip); min-width: 0; }
+.guide b { color: var(--ink); font-weight: 600; display: block; font-size: 13.5px; }
+
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 18px; align-items: start; }
+@media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+.scope { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 10px; display: grid; gap: 10px; min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 18px; height: 0; border-top: 2.5px solid currentColor; display: inline-block; }
+.sw.dash { border-top-style: dashed; border-top-width: 2px; }
+.sw.dot { width: 8px; height: 8px; border: 0; border-radius: 50%; background: currentColor; }
+.sw.tick { width: 2px; height: 9px; border: 0; background: currentColor; opacity: .55; }
+canvas { display: block; width: 100%; max-width: 100%; }
+.cv-main { aspect-ratio: 16 / 8.2; }
+.cv-small { aspect-ratio: 16 / 5.2; }
+@media (max-width: 560px) { .cv-main { aspect-ratio: 4 / 3.2; } .cv-small { aspect-ratio: 16 / 8; } }
+.sub-label { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding-top: 6px; border-top: 1px dashed var(--line); }
+
+.side { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 12px; }
+.card h4 { margin: 0; font: 600 12px/1.2 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.run { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.status { font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: auto; }
+.status b { color: var(--ink); font-weight: 500; }
+.progress { height: 4px; border-radius: 99px; background: var(--chip); overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--pinn); border-radius: 99px; }
+.banner { font-size: 13.5px; line-height: 1.45; padding: 10px 12px; border-radius: 6px; background: var(--chip); color: var(--muted); }
+.banner b { color: var(--ink); font-weight: 600; display: block; }
+.banner.ok { background: var(--good-soft); color: var(--ink); }
+.banner.ok b { color: var(--good); }
+
+.ctl { display: grid; gap: 4px; }
+.ctl label { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; }
+.ctl output { font-family: var(--f-mono); font-size: 12.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ctl .hint { font-size: 12px; color: var(--muted); }
+input[type="range"] { width: 100%; accent-color: var(--pinn); margin: 2px 0; }
+
+.readout { display: grid; font-variant-numeric: tabular-nums; }
+.readout .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; align-items: baseline; }
+.readout .row:last-child { border-bottom: 0; }
+.readout .v { font-family: var(--f-mono); font-size: 13px; }
+.readout .grp { font: 600 11.5px/1 var(--f-mono); letter-spacing: 0.07em; text-transform: uppercase; padding: 10px 0 4px; display: flex; align-items: center; gap: 7px; }
+.readout .grp:first-child { padding-top: 0; }
+.c-pinn { color: var(--pinn); }
+.c-nn { color: var(--nn); }
+.c-good { color: var(--good); }
+.big { font-family: var(--f-mono); font-size: 13px; }
+
+.discovered { font-family: var(--f-mono); font-size: 15.5px; line-height: 1.4; padding: 12px 14px; background: var(--chip); border-radius: 6px; overflow-x: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.discovered .p { color: var(--pinn); font-weight: 500; }
+.pill { display: inline-block; font: 500 11.5px/1 var(--f-mono); padding: 4px 7px; border-radius: 99px; background: var(--chip); color: var(--muted); }
+.pill.ok { color: var(--good); background: var(--good-soft); }
+
+/* ---------- method ---------- */
+.method { display: grid; gap: 20px; scroll-margin-top: 70px; }
+.diagram { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow-x: auto; }
+.diagram svg { display: block; min-width: 760px; width: 100%; height: auto; }
+.diagram .box { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+.diagram .box.pinn { fill: var(--pinn-soft); stroke: var(--pinn); }
+.diagram .box.nn { fill: var(--nn-soft); stroke: var(--nn); }
+.diagram .box.ink { fill: var(--chip); stroke: var(--muted); }
+.diagram .t1 { fill: var(--ink); font: 600 14px var(--f-body); }
+.diagram .t2 { fill: var(--muted); font: 400 12px var(--f-mono); }
+.diagram .wire { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.diagram .wire.loop { stroke: var(--pinn); stroke-dasharray: 5 4; }
+.diagram .head { fill: var(--muted); }
+.diagram .head.pinn { fill: var(--pinn); }
+.diagram .lbl { fill: var(--pinn); font: 500 12px var(--f-mono); }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+@media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.cols section { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.cols h3 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 18px; }
+.cols p { margin: 0; color: var(--muted); max-width: 62ch; }
+.math { font-family: var(--f-mono); font-size: 13.5px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; white-space: nowrap; color: var(--ink); line-height: 1.7; }
+.specs { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- applications ---------- */
+.apps { display: grid; gap: 18px; scroll-margin-top: 70px; }
+.app-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .app-grid { grid-template-columns: minmax(0, 1fr); } }
+.app { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.app .eq { font: 500 12.5px/1.3 var(--f-mono); color: var(--pinn); }
+.app h3 { margin: 0; font: 700 17px/1.25 var(--f-display); }
+.app p { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+footer { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 16px; }
+footer .mono { font-family: var(--f-mono); }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .live::before { animation: none; }
+  .btn { transition: none; }
+}
+</style>
+
+<div class="wrap">
+  <nav class="nav" aria-label="Page">
+    <a class="brand" href="#top" id="top">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+        <rect x="0.75" y="0.75" width="24.5" height="24.5" rx="6" fill="var(--pinn)"/>
+        <path d="M4 13 C6 4, 8 4, 9.5 13 S12.5 19.5, 14 13 S16.5 8.5, 17.5 13 S19.5 15.5, 22 13" stroke="var(--on-accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      PINN Lab
+    </a>
+    <div class="nav-links">
+      <a href="#experiments">Experiments</a>
+      <a href="#method">How it works</a>
+      <a href="#applications">Applications</a>
+    </div>
+  </nav>
+
+  <!-- ============ Hero ============ -->
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow">Scientific machine learning · runs in your browser</div>
+      <h1>Neural networks that <em>obey the laws of physics</em></h1>
+      <p class="lede">A normal neural network only knows the data it has seen. A <strong>physics-informed neural network (PINN)</strong> is also trained to respect Newton's second law, so it can predict what happens next and even measure constants nobody told it. Every model on this page is training live, on an engine I wrote from scratch.</p>
+      <div class="cta">
+        <a class="btn primary" href="#experiments">See the experiments ↓</a>
+        <a class="btn" href="#method">How it works</a>
+      </div>
+      <div class="tag-row">
+        <span class="tag">0 ML libraries</span>
+        <span class="tag">Hand-derived backprop</span>
+        <span class="tag">Gradient-checked</span>
+      </div>
+    </div>
+    <div class="stage-card">
+      <div class="stage-head">
+        <b>Three springs. Which one learned physics?</b>
+        <span class="live">Live</span>
+      </div>
+      <canvas id="stage" role="img" aria-label="Animated springs showing the exact motion, the standard network's prediction and the physics-informed network's prediction"></canvas>
+      <p class="stage-note">Each mass follows its network's current prediction, replayed in slow motion. Faint outlines show where the real mass should be. Both networks only saw data from the shaded part of the timeline.</p>
+    </div>
+  </header>
+
+  <!-- ============ Live results ============ -->
+  <section class="strip" aria-label="Live results">
+    <div class="stat"><span class="k">PINN error</span><span class="v c-pinn" id="st-pinn">–</span><span class="s">over the full motion</span></div>
+    <div class="stat"><span class="k">Standard NN error</span><span class="v c-nn" id="st-nn">–</span><span class="s">same data, no physics</span></div>
+    <div class="stat"><span class="k">Hidden stiffness k</span><span class="v" id="st-k">–</span><span class="s" id="st-k-s">recovered from noisy data</span></div>
+    <div class="stat"><span class="k">Gradient check</span><span class="v c-good" id="st-grad">–</span><span class="s">max error vs finite differences</span></div>
+  </section>
+
+  <!-- ============ Experiments ============ -->
+  <section class="experiments" id="experiments" aria-labelledby="exp-h">
+    <div class="sec-head">
+      <h2 id="exp-h">Two experiments</h2>
+      <p>Both run on a damped spring, the classic system from every first-year mechanics course: <span class="big">ẍ + μẋ + kx = 0</span>. Drag any slider to change the physics and watch the networks retrain.</p>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="Experiments">
+      <button class="tab" role="tab" id="tab-extrapolate" aria-controls="panel-extrapolate" aria-selected="true"><span class="n">01</span>Predict beyond the data</button>
+      <button class="tab" role="tab" id="tab-discover" aria-controls="panel-discover" aria-selected="false"><span class="n">02</span>Discover hidden physics</button>
+    </nav>
+
+    <!-- Experiment 1 -->
+    <section class="exp" id="panel-extrapolate" role="tabpanel" aria-labelledby="tab-extrapolate">
+      <div class="exp-head">
+        <h3>Same data, same network. One of them knows physics.</h3>
+        <p>The spring is sampled 10 times, only near the start of its motion. Two identical networks (1&rarr;32&rarr;32&rarr;32&rarr;1, same starting weights) learn from those samples. The physics-informed one is also checked against the equation of motion at 40 points across the whole timeline.</p>
+      </div>
+      <div class="guide">
+        <div><b>The shaded area</b>is all the data either network gets.</div>
+        <div><b>Orange vs blue</b>Watch what each network does once the data runs out.</div>
+        <div><b>The blue ticks</b>are where the physics is checked. No data is needed there.</div>
+      </div>
+      <div class="bench">
+        <div class="scope">
+          <div class="legend">
+            <span style="color:var(--truth)"><i class="sw dash"></i>Exact solution</span>
+            <span style="color:var(--truth)"><i class="sw dot"></i>Training data</span>
+            <span class="c-nn"><i class="sw"></i>Standard NN</span>
+            <span class="c-pinn"><i class="sw"></i>Physics-informed NN</span>
+            <span class="c-pinn"><i class="sw tick"></i>Physics check points</span>
+          </div>
+          <canvas id="cv1" class="cv-main" role="img" aria-label="Displacement versus time for the exact solution, the standard network and the physics-informed network"></canvas>
+          <div class="sub-label">Training loss (log scale) vs step · <span class="c-nn">NN data</span> · <span class="c-pinn">PINN data</span> · <span class="c-pinn">PINN physics (dashed)</span></div>
+          <canvas id="cv1loss" class="cv-small" role="img" aria-label="Training loss curves"></canvas>
+        </div>
+        <aside class="side">
+          <div class="card">
+            <div class="run">
+              <button class="btn primary sm" id="e1-toggle">Pause</button>
+              <button class="btn sm" id="e1-reset">Restart</button>
+              <span class="status" id="e1-status">step <b>0</b></span>
+            </div>
+            <div class="progress" aria-hidden="true"><i id="e1-prog"></i></div>
+            <div class="banner" id="e1-banner"></div>
+            <div class="readout" id="e1-readout"></div>
+          </div>
+          <div class="card">
+            <h4>Change the physics</h4>
+            <div class="ctl">
+              <label for="e1-delta">Damping δ <output id="e1-delta-o"></output></label>
+              <input type="range" id="e1-delta" min="0.5" max="5" step="0.1" value="2">
+            </div>
+            <div class="ctl">
+              <label for="e1-w0">Natural frequency ω₀ <output id="e1-w0-o"></output></label>
+              <input type="range" id="e1-w0" min="8" max="30" step="1" value="20">
+            </div>
+            <div class="ctl">
+              <label for="e1-win">Observed window <output id="e1-win-o"></output></label>
+              <input type="range" id="e1-win" min="0.2" max="0.7" step="0.02" value="0.4">
+            </div>
+            <div class="ctl">
+              <label for="e1-lam">Physics weight λ <output id="e1-lam-o"></output></label>
+              <input type="range" id="e1-lam" min="-2" max="2" step="0.25" value="1">
+              <span class="hint">Turn λ down to 0.01 and the PINN starts behaving like the standard network.</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Experiment 2 -->
+    <section class="exp" id="panel-discover" role="tabpanel" aria-labelledby="tab-discover" hidden>
+      <div class="exp-head">
+        <h3>Measure the spring without touching it.</h3>
+        <p>This time the damping μ and stiffness k are unknown. The network only gets noisy position readings. It treats μ and k as two extra trainable weights and adjusts them until its curve fits the data <em>and</em> obeys <span class="big">ẍ + μẋ + kx = 0</span>. Going from observations back to the law that produced them is called an inverse problem.</p>
+      </div>
+      <div class="guide">
+        <div><b>The dots</b>are noisy sensor readings. That is all the network sees.</div>
+        <div><b>The equation box</b>shows the law the network currently believes.</div>
+        <div><b>The lower chart</b>tracks each estimate. 1.0 means it hit the true value.</div>
+      </div>
+      <div class="bench">
+        <div class="scope">
+          <div class="legend">
+            <span style="color:var(--truth)"><i class="sw dash"></i>True motion (hidden)</span>
+            <span style="color:var(--truth)"><i class="sw dot"></i>Noisy measurements</span>
+            <span class="c-pinn"><i class="sw"></i>PINN reconstruction</span>
+          </div>
+          <canvas id="cv2" class="cv-main" role="img" aria-label="Noisy measurements and the physics-informed network's reconstruction"></canvas>
+          <div class="sub-label">Estimate ÷ true value vs step (1.0 = exact) · <span class="c-nn">damping μ</span> · <span class="c-pinn">stiffness k</span></div>
+          <canvas id="cv2par" class="cv-small" role="img" aria-label="Convergence of the estimated damping and stiffness toward their true values"></canvas>
+        </div>
+        <aside class="side">
+          <div class="card">
+            <div class="run">
+              <button class="btn primary sm" id="e2-toggle">Pause</button>
+              <button class="btn sm" id="e2-reset">Restart</button>
+              <span class="status" id="e2-status">step <b>0</b></span>
+            </div>
+            <div class="progress" aria-hidden="true"><i id="e2-prog"></i></div>
+            <h4>Equation the network found</h4>
+            <div class="discovered" id="e2-eq"></div>
+            <div class="banner" id="e2-banner"></div>
+            <div class="readout" id="e2-readout"></div>
+          </div>
+          <div class="card">
+            <h4>Hidden ground truth</h4>
+            <div class="ctl">
+              <label for="e2-mu">True damping μ <output id="e2-mu-o"></output></label>
+              <input type="range" id="e2-mu" min="1" max="10" step="0.5" value="4">
+            </div>
+            <div class="ctl">
+              <label for="e2-k">True stiffness k <output id="e2-k-o"></output></label>
+              <input type="range" id="e2-k" min="150" max="700" step="10" value="400">
+            </div>
+            <div class="ctl">
+              <label for="e2-noise">Sensor noise σ <output id="e2-noise-o"></output></label>
+              <input type="range" id="e2-noise" min="0" max="0.2" step="0.01" value="0.05">
+            </div>
+            <div class="ctl">
+              <label for="e2-n">Measurements <output id="e2-n-o"></output></label>
+              <input type="range" id="e2-n" min="15" max="100" step="5" value="40">
+              <span class="hint">The network starts from the guess μ = 0, k = 100. With heavy damping, strong noise or few points, the data itself stops pinning the constants down.</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ Method ============ -->
+  <section class="method" id="method" aria-labelledby="method-h">
+    <div class="sec-head">
+      <h2 id="method-h">How it works</h2>
+      <p>One training step, from input to weight update. The blue path is what turns an ordinary network into a physics-informed one.</p>
+    </div>
+    <div class="diagram">
+      <svg viewBox="0 0 900 250" role="img" aria-label="Training pipeline: time goes into the network, a Taylor pass returns u and its derivatives, which feed a data loss and a physics loss, summed into a total loss that Adam minimises">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head pinn" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="box ink" x="10" y="80" width="96" height="60" rx="8"/>
+        <text class="t1" x="58" y="106" text-anchor="middle">time t</text>
+        <text class="t2" x="58" y="126" text-anchor="middle">input</text>
+
+        <rect class="box" x="140" y="70" width="180" height="80" rx="8"/>
+        <text class="t1" x="230" y="100" text-anchor="middle">Neural network u(t)</text>
+        <text class="t2" x="230" y="120" text-anchor="middle">1→32→32→32→1</text>
+        <text class="t2" x="230" y="138" text-anchor="middle">tanh layers</text>
+
+        <rect class="box pinn" x="356" y="70" width="170" height="80" rx="8"/>
+        <text class="t1" x="441" y="100" text-anchor="middle">Taylor pass</text>
+        <text class="t2" x="441" y="120" text-anchor="middle">returns u, u̇, ü</text>
+        <text class="t2" x="441" y="138" text-anchor="middle">in one sweep</text>
+
+        <rect class="box nn" x="566" y="18" width="180" height="64" rx="8"/>
+        <text class="t1" x="656" y="44" text-anchor="middle">Data loss</text>
+        <text class="t2" x="656" y="64" text-anchor="middle">(u − y)² at samples</text>
+
+        <rect class="box pinn" x="566" y="138" width="180" height="64" rx="8"/>
+        <text class="t1" x="656" y="164" text-anchor="middle">Physics loss</text>
+        <text class="t2" x="656" y="184" text-anchor="middle">(ü + μu̇ + ku)²</text>
+
+        <rect class="box ink" x="780" y="80" width="114" height="60" rx="8"/>
+        <text class="t1" x="837" y="106" text-anchor="middle">Total loss</text>
+        <text class="t2" x="837" y="126" text-anchor="middle">data + λ·phys</text>
+
+        <path class="wire" d="M106 110 H138" marker-end="url(#ah)"/>
+        <path class="wire" d="M320 110 H354" marker-end="url(#ah)"/>
+        <path class="wire" d="M526 100 C546 100, 546 50, 564 50" marker-end="url(#ah)"/>
+        <path class="wire" d="M526 120 C546 120, 546 170, 564 170" marker-end="url(#ah)"/>
+        <path class="wire" d="M746 50 C764 50, 760 100, 778 100" marker-end="url(#ah)"/>
+        <path class="wire" d="M746 170 C764 170, 760 120, 778 120" marker-end="url(#ah)"/>
+        <path class="wire loop" d="M836 140 V228 H230 V152" marker-end="url(#ahp)"/>
+        <text class="lbl" x="533" y="222" text-anchor="middle">backprop + Adam: update weights (and μ, k in experiment 02)</text>
+      </svg>
+    </div>
+    <div class="cols">
+      <section>
+        <h3>The loss is the physics</h3>
+        <p>Both terms are minimised together. The first matches the measurements. The second is the equation of motion evaluated on the network itself, at check points where no data exists.</p>
+        <div class="math">
+          𝓛(θ) = <span class="c-nn">1/N Σ (u<sub>θ</sub>(tᵢ) − yᵢ)²</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ λ · <span class="c-pinn">1/M Σ (ü<sub>θ</sub> + μu̇<sub>θ</sub> + ku<sub>θ</sub>)²|<sub>tⱼ</sub></span>
+        </div>
+      </section>
+      <section>
+        <h3>Derivatives of the network</h3>
+        <p>The physics term needs u̇ and ü of the network with respect to time. The engine pushes a second-order Taylor expansion through every layer, so one forward pass returns all three. I derived the backpropagation through that pass by hand.</p>
+        <div class="math">
+          a = tanh z, &nbsp;s = 1 − a²<br>
+          ȧ = s ż, &nbsp;ä = s z̈ − 2 a s ż²
+        </div>
+      </section>
+      <section>
+        <h3>Verified, then trained</h3>
+        <p>When this page loads, it compares every analytic gradient against a finite-difference estimate. Training uses Adam with a decaying learning rate in 64-bit floats, at hundreds of steps per second on a laptop CPU.</p>
+        <div class="math" id="gradcheck">Gradient check: running…</div>
+      </section>
+    </div>
+    <div class="specs">
+      <span class="tag">Pure JavaScript</span>
+      <span class="tag">Taylor-mode forward + reverse-mode autodiff</span>
+      <span class="tag">tanh MLP, Xavier init</span>
+      <span class="tag">Adam, exponential LR decay</span>
+      <span class="tag">Forward and inverse problems</span>
+    </div>
+  </section>
+
+  <!-- ============ Applications ============ -->
+  <section class="apps" id="applications" aria-labelledby="apps-h">
+    <div class="sec-head">
+      <h2 id="apps-h">Where this idea is used</h2>
+      <p>The spring is a teaching example. The same recipe works whenever data is scarce or noisy and the governing equations are known.</p>
+    </div>
+    <div class="app-grid">
+      <article class="app">
+        <span class="eq">Navier–Stokes</span>
+        <h3>Blood flow</h3>
+        <p>Reconstructing velocity and pressure in arteries from sparse medical imaging.</p>
+      </article>
+      <article class="app">
+        <span class="eq">Heat equation</span>
+        <h3>Thermal design</h3>
+        <p>Predicting temperature fields in chips and batteries from a few sensors.</p>
+      </article>
+      <article class="app">
+        <span class="eq">Elasticity</span>
+        <h3>Materials</h3>
+        <p>Inferring stiffness and hidden defects from how a structure deforms, just like experiment 02.</p>
+      </article>
+      <article class="app">
+        <span class="eq">Wave equation</span>
+        <h3>Geophysics</h3>
+        <p>Mapping underground structure from seismic recordings at the surface.</p>
+      </article>
+    </div>
+  </section>
+
+  <footer>
+    <span>Method: Raissi, Perdikaris &amp; Karniadakis, <em>Journal of Computational Physics</em> 378 (2019).</span>
+    <span class="mono">Built from scratch · no ML libraries</span>
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* ======================================================================
+   Tiny autodiff engine for scalar-input MLPs.
+   Forward: propagates (u, du/dt, d2u/dt2) through tanh layers (Taylor mode).
+   Backward: hand-derived reverse mode through that Taylor pass.
+   ====================================================================== */
+
+function rngFrom(seed) { // mulberry32
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function makeNet(sizes, seed, opts = {}) {
+  const layers = [];
+  let n = 0;
+  for (let l = 0; l < sizes.length - 1; l++) {
+    const fin = sizes[l], fout = sizes[l + 1];
+    layers.push({ fin, fout, w: n, b: n + fin * fout });
+    n += fin * fout + fout;
+  }
+  const extra = opts.extra || 0;
+  const extraOff = n;
+  n += extra;
+  const net = {
+    sizes, layers, extraOff, n,
+    p: new Float64Array(n), g: new Float64Array(n), m: new Float64Array(n), v: new Float64Array(n),
+    t: 0, extraLr: opts.extraLr || 1,
+    alpha: opts.alpha ?? 2, beta: opts.beta ?? -1, // input map x = alpha*t + beta (t in [0,1] -> x in [-1,1])
+    acts: sizes.map(s => ({ a: new Float64Array(s), a1: new Float64Array(s), a2: new Float64Array(s), z1: new Float64Array(s), z2: new Float64Array(s) })),
+    grads: sizes.map(s => ({ g0: new Float64Array(s), g1: new Float64Array(s), g2: new Float64Array(s) })),
+  };
+  const rng = rngFrom(seed);
+  for (const L of layers) {
+    const std = Math.sqrt(2 / (L.fin + L.fout));
+    for (let i = 0; i < L.fin * L.fout; i++) net.p[L.w + i] = std * gauss(rng);
+  }
+  return net;
+}
+
+// Returns [u, du/dt, d2u/dt2]. Leaves activations in net.acts for backward().
+function forward(net, t) {
+  const { p, layers, acts } = net;
+  const nL = layers.length;
+  const a0 = acts[0];
+  a0.a[0] = net.alpha * t + net.beta; a0.a1[0] = net.alpha; a0.a2[0] = 0;
+  for (let l = 0; l < nL; l++) {
+    const L = layers[l], inp = acts[l], out = acts[l + 1];
+    const ia = inp.a, ia1 = inp.a1, ia2 = inp.a2, fin = L.fin, last = l === nL - 1;
+    for (let j = 0; j < L.fout; j++) {
+      let s0 = p[L.b + j], s1 = 0, s2 = 0;
+      const row = L.w + j * fin;
+      for (let i = 0; i < fin; i++) {
+        const w = p[row + i];
+        s0 += w * ia[i]; s1 += w * ia1[i]; s2 += w * ia2[i];
+      }
+      if (last) { out.a[j] = s0; out.a1[j] = s1; out.a2[j] = s2; }
+      else {
+        const th = Math.tanh(s0), s = 1 - th * th;
+        out.z1[j] = s1; out.z2[j] = s2;
+        out.a[j] = th; out.a1[j] = s * s1; out.a2[j] = s * s2 - 2 * th * s * s1 * s1;
+      }
+    }
+  }
+  const o = acts[nL];
+  return [o.a[0], o.a1[0], o.a2[0]];
+}
+
+// Cheap order-0 forward for plotting.
+function predict(net, t) {
+  const { p, layers, acts } = net;
+  const nL = layers.length;
+  acts[0].a[0] = net.alpha * t + net.beta;
+  for (let l = 0; l < nL; l++) {
+    const L = layers[l], ia = acts[l].a, oa = acts[l + 1].a, fin = L.fin, last = l === nL - 1;
+    for (let j = 0; j < L.fout; j++) {
+      let s0 = p[L.b + j];
+      const row = L.w + j * fin;
+      for (let i = 0; i < fin; i++) s0 += p[row + i] * ia[i];
+      oa[j] = last ? s0 : Math.tanh(s0);
+    }
+  }
+  return acts[nL].a[0];
+}
+
+// Accumulates dLoss/dparams into net.g, given dLoss/du, dLoss/du', dLoss/du''.
+function backward(net, gu, gu1, gu2) {
+  const { p, g, layers, acts, grads } = net;
+  const nL = layers.length;
+  let G = grads[nL];
+  G.g0[0] = gu; G.g1[0] = gu1; G.g2[0] = gu2;
+  for (let l = nL - 1; l >= 0; l--) {
+    const L = layers[l], inp = acts[l], fin = L.fin, fout = L.fout;
+    const ia = inp.a, ia1 = inp.a1, ia2 = inp.a2;
+    const g0 = G.g0, g1 = G.g1, g2 = G.g2;
+    for (let j = 0; j < fout; j++) {
+      const c0 = g0[j], c1 = g1[j], c2 = g2[j];
+      g[L.b + j] += c0;
+      const row = L.w + j * fin;
+      for (let i = 0; i < fin; i++) g[row + i] += c0 * ia[i] + c1 * ia1[i] + c2 * ia2[i];
+    }
+    if (l === 0) break;
+    const P = grads[l], h0 = P.g0, h1 = P.g1, h2 = P.g2;
+    for (let i = 0; i < fin; i++) {
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let j = 0; j < fout; j++) {
+        const w = p[L.w + j * fin + i];
+        b0 += w * g0[j]; b1 += w * g1[j]; b2 += w * g2[j];
+      }
+      // b* = dL/d(a, a', a'') of layer l's input. Convert to dL/d(z, z', z'') through tanh.
+      const th = ia[i], s = 1 - th * th, z1 = inp.z1[i], z2 = inp.z2[i];
+      h0[i] = b0 * s + b1 * (-2 * th * s * z1) + b2 * (-2 * th * s * z2 - 2 * z1 * z1 * s * (s - 2 * th * th));
+      h1[i] = b1 * s + b2 * (-4 * th * s * z1);
+      h2[i] = b2 * s;
+    }
+    G = P;
+  }
+}
+
+function adam(net, lr) {
+  net.t++;
+  const b1 = 0.9, b2 = 0.999, eps = 1e-8;
+  const bc1 = 1 - Math.pow(b1, net.t), bc2 = 1 - Math.pow(b2, net.t);
+  const { p, g, m, v, extraOff } = net;
+  for (let i = 0; i < net.n; i++) {
+    const gi = g[i];
+    m[i] = b1 * m[i] + (1 - b1) * gi;
+    v[i] = b2 * v[i] + (1 - b2) * gi * gi;
+    const step = (i >= extraOff ? lr * net.extraLr : lr) * (m[i] / bc1) / (Math.sqrt(v[i] / bc2) + eps);
+    p[i] -= step;
+  }
+}
+
+/* Physics task.
+   residual r = c2*u'' + c1*u' + c0*u  (scaled so r is O(1)). */
+function computeLoss(net, task, accumulate) {
+  if (accumulate) net.g.fill(0);
+  let ld = 0, lp = 0;
+  const { dt, dy, ct, lamD, lamP } = task;
+  const Nd = dt.length, Nc = ct ? ct.length : 0;
+  for (let i = 0; i < Nd; i++) {
+    const u = accumulate ? forward(net, dt[i])[0] : predict(net, dt[i]);
+    const e = u - dy[i];
+    ld += e * e;
+    if (accumulate) backward(net, 2 * lamD * e / Nd, 0, 0);
+  }
+  if (Nc && lamP > 0) {
+    const c = task.coef(net);
+    let gc1 = 0, gc0 = 0;
+    for (let j = 0; j < Nc; j++) {
+      const [u, u1, u2] = forward(net, ct[j]);
+      const r = c.c2 * u2 + c.c1 * u1 + c.c0 * u;
+      lp += r * r;
+      if (accumulate) {
+        const gr = 2 * lamP * r / Nc;
+        backward(net, gr * c.c0, gr * c.c1, gr * c.c2);
+        gc1 += gr * u1; gc0 += gr * u;
+      }
+    }
+    if (accumulate && task.inverse) task.coefGrad(net, gc1, gc0);
+  }
+  ld /= Nd; lp = Nc ? lp / Nc : 0;
+  return { ld, lp, total: lamD * ld + lamP * lp };
+}
+
+function trainStep(net, task, lr) {
+  const L = computeLoss(net, task, true);
+  adam(net, lr);
+  return L;
+}
+
+/* Exact solution: x'' + 2δx' + ω0² x = 0, x(0)=1, x'(0)=0 (underdamped). */
+function exactFn(delta, w0) {
+  const w = Math.sqrt(Math.max(w0 * w0 - delta * delta, 1e-9));
+  const phi = Math.atan(-delta / w);
+  const A = 1 / (2 * Math.cos(phi));
+  return t => Math.exp(-delta * t) * 2 * A * Math.cos(phi + w * t);
+}
+
+/* ======================================================================
+   Gradient check (runs on load)
+   ====================================================================== */
+function gradCheck() {
+  const net = makeNet([1, 6, 5, 1], 7, { extra: 2 });
+  net.p[net.extraOff] = 0.3; net.p[net.extraOff + 1] = 0.2;
+  const S = 50;
+  const task = {
+    dt: Float64Array.from([0.05, 0.3, 0.71]), dy: Float64Array.from([0.9, -0.2, 0.4]),
+    ct: Float64Array.from([0.1, 0.45, 0.8, 0.95]), lamD: 1, lamP: 0.7, inverse: true,
+    coef: n => { const mu = 10 * n.p[n.extraOff], k = 100 * Math.exp(n.p[n.extraOff + 1]); return { c2: 1 / S, c1: mu / S, c0: k / S }; },
+    coefGrad: (n, gc1, gc0) => { const k = 100 * Math.exp(n.p[n.extraOff + 1]); n.g[n.extraOff] += gc1 * 10 / S; n.g[n.extraOff + 1] += gc0 * k / S; },
+  };
+  computeLoss(net, task, true);
+  const ana = Float64Array.from(net.g);
+  let maxRel = 0;
+  const h = 1e-5;
+  for (let i = 0; i < net.n; i++) {
+    const o = net.p[i];
+    net.p[i] = o + h; const fp = computeLoss(net, task, false).total;
+    net.p[i] = o - h; const fm = computeLoss(net, task, false).total;
+    net.p[i] = o;
+    const num = (fp - fm) / (2 * h);
+    const rel = Math.abs(num - ana[i]) / Math.max(1e-6, Math.abs(num) + Math.abs(ana[i]));
+    if (rel > maxRel) maxRel = rel;
+  }
+  return { maxRel, n: net.n };
+}
+
+/* ======================================================================
+   Plotting
+   ====================================================================== */
+let C = null;
+function readTheme() {
+  const s = getComputedStyle(document.documentElement);
+  const v = k => s.getPropertyValue(k).trim();
+  C = { ink: v("--ink"), muted: v("--muted"), line: v("--line"), grid: v("--grid"), pinn: v("--pinn"), nn: v("--nn"), truth: v("--truth"), shade: v("--shade"), panel: v("--panel"), good: v("--good"), chip: v("--chip"), mono: v("--f-mono"), body: v("--f-body") };
+}
+readTheme();
+
+function setupCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  return { ctx, W, H };
+}
+
+function niceTicks(lo, hi, count) {
+  const span = hi - lo, raw = span / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-6; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+  return out;
+}
+
+function fmtTick(v) {
+  if (Math.abs(v) >= 1000) return (v / 1000).toFixed(v % 1000 ? 1 : 0) + "k";
+  return String(Math.round(v * 1000) / 1000);
+}
+
+function drawChart(cv, o) {
+  const { ctx, W, H } = setupCanvas(cv);
+  if (!W || !H) return;
+  const pad = { l: 46, r: 12, t: 10, b: 26 };
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const [x0, x1] = o.x, [y0, y1] = o.y;
+  const ly = o.logY;
+  const ty = v => ly ? Math.log10(Math.max(v, 1e-12)) : v;
+  const Y0 = ty(y0), Y1 = ty(y1);
+  const X = v => pad.l + (v - x0) / (x1 - x0) * pw;
+  const Yp = v => pad.t + (1 - (ty(v) - Y0) / (Y1 - Y0)) * ph;
+  ctx.font = `11px ${C.mono}`;
+  ctx.lineWidth = 1;
+
+  if (o.shade) {
+    ctx.fillStyle = C.shade;
+    ctx.fillRect(X(o.shade[0]), pad.t, X(o.shade[1]) - X(o.shade[0]), ph);
+    if (o.shadeLabel) { ctx.fillStyle = C.muted; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(o.shadeLabel, X(o.shade[0]) + 6, pad.t + 5); }
+  }
+  ctx.strokeStyle = C.line; ctx.fillStyle = C.muted;
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  const yt = ly ? (() => { const a = []; for (let e = Math.ceil(Y0); e <= Math.floor(Y1); e++) a.push(Math.pow(10, e)); return a; })() : niceTicks(y0, y1, o.yTicks || 5);
+  for (const v of yt) {
+    const yy = Math.round(Yp(v)) + 0.5;
+    ctx.globalAlpha = v === 0 && !ly ? 1 : 0.6;
+    ctx.beginPath(); ctx.moveTo(pad.l, yy); ctx.lineTo(pad.l + pw, yy); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillText(ly ? "1e" + Math.round(Math.log10(v)) : fmtTick(v), pad.l - 6, yy);
+  }
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (const v of niceTicks(x0, x1, o.xTicks || 6)) {
+    const xx = Math.round(X(v)) + 0.5;
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath(); ctx.moveTo(xx, pad.t); ctx.lineTo(xx, pad.t + ph); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillText(fmtTick(v), xx, pad.t + ph + 6);
+  }
+  if (o.xLabel) { ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText(o.xLabel, pad.l + pw - 6, pad.t + ph - 13); }
+  if (o.yLabel) { ctx.save(); ctx.translate(11, pad.t + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(o.yLabel, 0, 0); ctx.restore(); }
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(pad.l, pad.t, pw, ph); ctx.clip();
+  for (const h of o.hlines || []) {
+    ctx.strokeStyle = C[h.color] || h.color; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(pad.l, Yp(h.y)); ctx.lineTo(pad.l + pw, Yp(h.y)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  for (const tk of o.ticks || []) {
+    ctx.strokeStyle = C[tk.color]; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5;
+    for (const x of tk.xs) { const xx = X(x); ctx.beginPath(); ctx.moveTo(xx, pad.t + ph); ctx.lineTo(xx, pad.t + ph - 8); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+  if (o.cursor != null) {
+    const xx = Math.round(X(o.cursor)) + 0.5;
+    ctx.strokeStyle = C.muted; ctx.globalAlpha = 0.6; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xx, pad.t); ctx.lineTo(xx, pad.t + ph); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  for (const s of o.series) {
+    if (!s.xs.length) continue;
+    ctx.strokeStyle = C[s.color] || s.color; ctx.lineWidth = s.width || 2;
+    ctx.setLineDash(s.dash || []); ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (let i = 0; i < s.xs.length; i++) {
+      const xx = X(s.xs[i]), yy = Yp(s.ys[i]);
+      i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (s.endDot) {
+      const n = s.xs.length - 1;
+      ctx.fillStyle = C[s.color]; ctx.beginPath(); ctx.arc(X(s.xs[n]), Yp(s.ys[n]), 3.2, 0, 7); ctx.fill();
+    }
+  }
+  for (const pt of o.points || []) {
+    for (let i = 0; i < pt.xs.length; i++) {
+      ctx.beginPath(); ctx.arc(X(pt.xs[i]), Yp(pt.ys[i]), pt.r || 4, 0, 7);
+      ctx.fillStyle = C[pt.color]; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = C.panel; ctx.stroke();
+    }
+  }
+  for (const d of o.cursorDots || []) {
+    ctx.beginPath(); ctx.arc(X(o.cursor), Yp(d.y), 5, 0, 7);
+    ctx.fillStyle = C[d.color]; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = C.panel; ctx.stroke();
+  }
+  ctx.restore();
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+  ctx.strokeRect(pad.l + 0.5, pad.t + 0.5, pw - 1, ph - 1);
+}
+
+/* ======================================================================
+   Spring stage (hero animation)
+   ====================================================================== */
+const reducedMotion = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
+const CYCLE_MS = 5200;   // one playback of t = 0..1 s, plus a short hold
+let playT = 0.72;
+
+function drawSpring(ctx, x, y1, y2, halfW, coils) {
+  const lead = 7, len = y2 - y1 - 2 * lead;
+  ctx.beginPath();
+  ctx.moveTo(x, y1); ctx.lineTo(x, y1 + lead);
+  const n = coils * 2;
+  for (let i = 1; i <= n; i++) {
+    const yy = y1 + lead + len * (i - 0.5) / n;
+    ctx.lineTo(x + (i % 2 ? halfW : -halfW), yy);
+  }
+  ctx.lineTo(x, y2 - lead); ctx.lineTo(x, y2);
+  ctx.stroke();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawStage() {
+  const cv = document.getElementById("stage");
+  const { ctx, W, H } = setupCanvas(cv);
+  if (!W || !H) return;
+  const t = playT, win = E1.P.win;
+  const truthU = E1.f(t);
+  const cols = [
+    { name: "Exact", color: C.truth, u: truthU, ghost: false },
+    { name: "Standard NN", color: C.nn, u: predict(E1.nn, t), ghost: true },
+    { name: "Physics-informed", color: C.pinn, u: predict(E1.pinn, t), ghost: true },
+  ];
+  const ceilY = 30, labelY = H - 50, barY = H - 16;
+  const eqY = ceilY + (labelY - 26 - ceilY) * 0.55;
+  const amp = (labelY - 26 - ceilY) * 0.3;
+  const massW = Math.min(56, W / 3 * 0.42), massH = massW * 0.62;
+  const colW = W / 3;
+  const posY = u => eqY - Math.max(-1.45, Math.min(1.45, u)) * amp;
+
+  // header text
+  ctx.font = `12px ${C.mono}`; ctx.textBaseline = "middle";
+  ctx.fillStyle = C.muted; ctx.textAlign = "left";
+  ctx.fillText(`t = ${t.toFixed(2)} s`, 4, 10);
+  ctx.textAlign = "right";
+  const inside = t <= win;
+  ctx.fillStyle = inside ? C.muted : C.pinn;
+  ctx.fillText(inside ? "inside the data" : "beyond the data", W - 4, 10);
+
+  cols.forEach((c, i) => {
+    const cx = colW * (i + 0.5);
+    // ceiling with hatching
+    ctx.strokeStyle = C.muted; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - massW * 0.75, ceilY); ctx.lineTo(cx + massW * 0.75, ceilY); ctx.stroke();
+    ctx.lineWidth = 1; ctx.globalAlpha = 0.5;
+    for (let k = -massW * 0.75; k < massW * 0.75; k += 7) { ctx.beginPath(); ctx.moveTo(cx + k, ceilY); ctx.lineTo(cx + k + 6, ceilY - 6); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    // equilibrium line
+    ctx.strokeStyle = C.line; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(cx - colW * 0.42, eqY); ctx.lineTo(cx + colW * 0.42, eqY); ctx.stroke();
+    ctx.setLineDash([]);
+    // ghost of the exact mass
+    if (c.ghost) {
+      ctx.strokeStyle = C.truth; ctx.globalAlpha = 0.55; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5;
+      roundRect(ctx, cx - massW / 2, posY(truthU) - massH / 2, massW, massH, 6); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+    // spring + mass
+    const my = posY(c.u);
+    ctx.strokeStyle = c.color; ctx.lineWidth = 2; ctx.lineJoin = "round";
+    drawSpring(ctx, cx, ceilY, my - massH / 2, massW * 0.22, 9);
+    ctx.fillStyle = c.color;
+    roundRect(ctx, cx - massW / 2, my - massH / 2, massW, massH, 6); ctx.fill();
+    // labels
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = c.color; ctx.font = `600 13px ${C.body}`;
+    ctx.fillText(c.name, cx, labelY);
+    ctx.fillStyle = C.muted; ctx.font = `11.5px ${C.mono}`;
+    const err = c.ghost ? `off by ${Math.abs(c.u - truthU).toFixed(2)}` : `u = ${c.u.toFixed(2)}`;
+    ctx.fillText(err, cx, labelY + 16);
+  });
+
+  // timeline
+  const x0 = 8, x1 = W - 8;
+  ctx.fillStyle = C.chip; roundRect(ctx, x0, barY - 3, x1 - x0, 6, 3); ctx.fill();
+  ctx.fillStyle = C.pinn; ctx.globalAlpha = 0.28;
+  roundRect(ctx, x0, barY - 3, (x1 - x0) * win, 6, 3); ctx.fill();
+  ctx.globalAlpha = 1;
+  const px = x0 + (x1 - x0) * t;
+  ctx.beginPath(); ctx.arc(px, barY, 6, 0, 7); ctx.fillStyle = C.ink; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = C.panel; ctx.stroke();
+}
+
+/* ======================================================================
+   Experiments
+   ====================================================================== */
+const ARCH = [1, 32, 32, 32, 1];
+const EVAL_N = 240;
+const EVAL_T = Float64Array.from({ length: EVAL_N }, (_, i) => i / (EVAL_N - 1));
+const MAX_STEPS = 15000;
+// Learning rate decays exponentially from 3e-3 to 1e-4 over 12k steps, then holds.
+const lrAt = s => 3e-3 * Math.pow(1e-4 / 3e-3, Math.min(s / 12000, 1));
+const $ = id => document.getElementById(id);
+const fmtE = v => v.toExponential(2);
+const pct = v => (v * 100 < 10 ? (v * 100).toFixed(1) : Math.round(v * 100)) + "%";
+
+function relErr(pred, truth) {
+  let num = 0, den = 0;
+  for (let i = 0; i < pred.length; i++) { const e = pred[i] - truth[i]; num += e * e; den += truth[i] * truth[i]; }
+  return Math.sqrt(num / den);
+}
+
+function makeHistory() { return { s: [], a: [], b: [], c: [] }; }
+function pushHist(h, s, a, b, c) {
+  h.s.push(s); h.a.push(a); h.b.push(b); h.c.push(c);
+  if (h.s.length > 1200) for (const k of Object.keys(h)) h[k] = h[k].filter((_, i) => i % 2 === 0);
+}
+
+function stepText(E) {
+  return E.done ? `done · <b>${E.step.toLocaleString()}</b> steps` : `step <b>${E.step.toLocaleString()}</b>`;
+}
+
+// ---------- Experiment 1: extrapolation ----------
+const E1 = {
+  running: true, step: 0, uiAt: 0,
+  read() {
+    return { delta: +$("e1-delta").value, w0: +$("e1-w0").value, win: +$("e1-win").value, lam: Math.pow(10, +$("e1-lam").value) };
+  },
+  reset() {
+    const P = this.P = this.read();
+    $("e1-delta-o").textContent = P.delta.toFixed(1) + " s⁻¹";
+    $("e1-w0-o").textContent = P.w0 + " rad/s";
+    $("e1-win-o").textContent = "0 – " + P.win.toFixed(2) + " s";
+    $("e1-lam-o").textContent = P.lam < 0.1 ? P.lam.toFixed(3) : P.lam < 10 ? P.lam.toFixed(2) : P.lam.toFixed(0);
+    this.f = exactFn(P.delta, P.w0);
+    const Nd = 10, Nc = 40;
+    const dt = Float64Array.from({ length: Nd }, (_, i) => i * P.win / Nd);
+    const dy = dt.map(this.f);
+    const ct = Float64Array.from({ length: Nc }, (_, j) => j / (Nc - 1));
+    const S = P.w0 * P.w0;
+    this.taskNN = { dt, dy, ct: null, lamD: 1, lamP: 0 };
+    this.taskPINN = { dt, dy, ct, lamD: 1, lamP: P.lam, coef: () => ({ c2: 1 / S, c1: 2 * P.delta / S, c0: 1 }) };
+    this.nn = makeNet(ARCH, 1234);
+    this.pinn = makeNet(ARCH, 1234);
+    this.step = 0; this.limit = MAX_STEPS; this.hist = makeHistory(); this.done = false;
+    this.truthY = Array.from(EVAL_T, this.f);
+    this.last = { nn: { ld: NaN }, pinn: { ld: NaN, lp: NaN } };
+    this.eNN = NaN; this.ePI = NaN;
+    this.setRunning(true);
+    this.uiAt = 0;
+  },
+  setRunning(on) { this.running = on; $("e1-toggle").textContent = on ? "Pause" : (this.done ? "Train more" : "Resume"); },
+  tick(budgetMs) {
+    const t0 = performance.now();
+    while (performance.now() - t0 < budgetMs && this.step < this.limit) {
+      const lr = lrAt(this.step);
+      this.last.nn = trainStep(this.nn, this.taskNN, lr);
+      this.last.pinn = trainStep(this.pinn, this.taskPINN, lr);
+      this.step++;
+      if (this.step % 20 === 0) pushHist(this.hist, this.step, this.last.nn.ld, this.last.pinn.ld, this.last.pinn.lp);
+    }
+    if (this.step >= this.limit && !this.done) { this.done = true; this.setRunning(false); }
+  },
+  measure() {
+    this.nnY = Array.from(EVAL_T, t => predict(this.nn, t));
+    this.piY = Array.from(EVAL_T, t => predict(this.pinn, t));
+    this.eNN = relErr(this.nnY, this.truthY); this.ePI = relErr(this.piY, this.truthY);
+  },
+  draw() {
+    this.measure();
+    drawChart($("cv1"), {
+      x: [0, 1], y: [-1.5, 1.5], xLabel: "time t (s)", yLabel: "displacement u",
+      shade: [0, this.P.win], shadeLabel: "observed",
+      ticks: [{ xs: this.taskPINN.ct, color: "pinn" }],
+      cursor: playT,
+      cursorDots: [{ y: predict(this.nn, playT), color: "nn" }, { y: predict(this.pinn, playT), color: "pinn" }],
+      series: [
+        { xs: EVAL_T, ys: this.truthY, color: "truth", dash: [6, 5], width: 1.6 },
+        { xs: EVAL_T, ys: this.nnY, color: "nn", width: 2.4 },
+        { xs: EVAL_T, ys: this.piY, color: "pinn", width: 2.6 },
+      ],
+      points: [{ xs: this.taskNN.dt, ys: this.taskNN.dy, color: "truth", r: 4.5 }],
+    });
+    const now = performance.now();
+    if (now - this.uiAt < 120) return;
+    this.uiAt = now;
+    const h = this.hist;
+    drawChart($("cv1loss"), {
+      x: [0, Math.max(1000, this.step)], y: [1e-7, 10], logY: true, xTicks: 5,
+      series: [
+        { xs: h.s, ys: h.a, color: "nn", width: 1.6, endDot: true },
+        { xs: h.s, ys: h.b, color: "pinn", width: 1.6, endDot: true },
+        { xs: h.s, ys: h.c, color: "pinn", width: 1.4, dash: [3, 3] },
+      ],
+    });
+    const L = this.last, eNN = this.eNN, ePI = this.ePI;
+    $("e1-status").innerHTML = stepText(this);
+    $("e1-prog").style.width = Math.min(100, this.step / this.limit * 100) + "%";
+    const b = $("e1-banner");
+    if (this.step < 400) { b.className = "banner"; b.innerHTML = "<b>Warming up</b>Both networks start from the same random weights."; }
+    else if (ePI < 0.05 && eNN > 0.25) { b.className = "banner ok"; b.innerHTML = `<b>Physics learned</b>The PINN tracks the true motion everywhere. The standard network only fits where it saw data.`; }
+    else if (this.P.lam < 0.1) { b.className = "banner"; b.innerHTML = "<b>Physics turned down</b>With λ this small the PINN is nearly a standard network."; }
+    else { b.className = "banner"; b.innerHTML = "<b>Learning the equation</b>The PINN is bending its curve to satisfy the physics beyond the data."; }
+    $("e1-readout").innerHTML = `
+      <div class="grp c-nn"><i class="sw"></i>Standard NN</div>
+      <div class="row"><span>Data loss</span><span class="v">${isNaN(L.nn.ld) ? "–" : fmtE(L.nn.ld)}</span></div>
+      <div class="row"><span>Error over full motion</span><span class="v c-nn">${pct(eNN)}</span></div>
+      <div class="grp c-pinn"><i class="sw"></i>Physics-informed NN</div>
+      <div class="row"><span>Data loss</span><span class="v">${isNaN(L.pinn.ld) ? "–" : fmtE(L.pinn.ld)}</span></div>
+      <div class="row"><span>Physics loss</span><span class="v">${isNaN(L.pinn.lp) ? "–" : fmtE(L.pinn.lp)}</span></div>
+      <div class="row"><span>Error over full motion</span><span class="v c-pinn">${pct(ePI)}</span></div>`;
+  },
+};
+
+// ---------- Experiment 2: inverse problem ----------
+const E2 = {
+  running: true, step: 0, S: 300, uiAt: 0,
+  read() { return { mu: +$("e2-mu").value, k: +$("e2-k").value, noise: +$("e2-noise").value, n: +$("e2-n").value }; },
+  reset() {
+    const P = this.P = this.read();
+    $("e2-mu-o").textContent = P.mu.toFixed(1) + " s⁻¹";
+    $("e2-k-o").textContent = P.k + " s⁻²";
+    $("e2-noise-o").textContent = P.noise.toFixed(2);
+    $("e2-n-o").textContent = P.n;
+    this.f = exactFn(P.mu / 2, Math.sqrt(P.k));
+    const rng = rngFrom(99);
+    const dt = Float64Array.from({ length: P.n }, (_, i) => (i + 0.5) / P.n);
+    const dy = dt.map(t => this.f(t) + P.noise * gauss(rng));
+    const ct = Float64Array.from({ length: 80 }, (_, j) => j / 79);
+    const S = this.S;
+    this.net = makeNet(ARCH, 4321, { extra: 2, extraLr: 5 });
+    const eo = this.net.extraOff;
+    this.net.p[eo] = 0; this.net.p[eo + 1] = 0; // mu = 0, k = 100 initial guess
+    this.task = {
+      dt, dy, ct, lamD: 1, lamP: 1, inverse: true,
+      coef: n => ({ c2: 1 / S, c1: this.mu(n) / S, c0: this.k(n) / S }),
+      coefGrad: (n, gc1, gc0) => { n.g[eo] += gc1 * 10 / S; n.g[eo + 1] += gc0 * this.k(n) / S; },
+    };
+    this.step = 0; this.limit = MAX_STEPS; this.hist = makeHistory(); this.done = false; this.last = { ld: NaN, lp: NaN };
+    this.truthY = Array.from(EVAL_T, this.f);
+    this.setRunning(true);
+    this.uiAt = 0;
+  },
+  mu(n) { return 10 * n.p[n.extraOff]; },
+  k(n) { return 100 * Math.exp(n.p[n.extraOff + 1]); },
+  setRunning(on) { this.running = on; $("e2-toggle").textContent = on ? "Pause" : (this.done ? "Train more" : "Resume"); },
+  tick(budgetMs) {
+    const t0 = performance.now();
+    while (performance.now() - t0 < budgetMs && this.step < this.limit) {
+      this.last = trainStep(this.net, this.task, lrAt(this.step));
+      this.step++;
+      if (this.step % 20 === 0) pushHist(this.hist, this.step, this.mu(this.net) / this.P.mu, this.k(this.net) / this.P.k, this.last.ld);
+    }
+    if (this.step >= this.limit && !this.done) { this.done = true; this.setRunning(false); }
+  },
+  errors() {
+    const mu = this.mu(this.net), k = this.k(this.net);
+    return { mu, k, eMu: Math.abs(mu - this.P.mu) / this.P.mu, eK: Math.abs(k - this.P.k) / this.P.k };
+  },
+  draw() {
+    const now = performance.now();
+    if (now - this.uiAt < 60) return;
+    this.uiAt = now;
+    const y = Array.from(EVAL_T, t => predict(this.net, t));
+    drawChart($("cv2"), {
+      x: [0, 1], y: [-1.5, 1.5], xLabel: "time t (s)", yLabel: "displacement u",
+      series: [
+        { xs: EVAL_T, ys: this.truthY, color: "truth", dash: [6, 5], width: 1.6 },
+        { xs: EVAL_T, ys: y, color: "pinn", width: 2.6 },
+      ],
+      points: [{ xs: this.task.dt, ys: this.task.dy, color: "truth", r: 3.6 }],
+    });
+    const h = this.hist;
+    drawChart($("cv2par"), {
+      x: [0, Math.max(1000, this.step)], y: [0, 2], xTicks: 5, yTicks: 4,
+      hlines: [{ y: 1, color: "muted" }],
+      series: [
+        { xs: h.s, ys: h.a, color: "nn", width: 2, endDot: true },
+        { xs: h.s, ys: h.b, color: "pinn", width: 2, endDot: true },
+      ],
+    });
+    const { mu, k, eMu, eK } = this.errors();
+    $("e2-status").innerHTML = stepText(this);
+    $("e2-prog").style.width = Math.min(100, this.step / this.limit * 100) + "%";
+    $("e2-eq").innerHTML = `ẍ + <span class="p">${mu.toFixed(2)}</span> ẋ + <span class="p">${k.toFixed(1)}</span> x = 0`;
+    const b = $("e2-banner");
+    if (this.step < 200) { b.className = "banner"; b.innerHTML = "<b>Starting from a guess</b>μ = 0 and k = 100. Neither is right."; }
+    else if (eMu < 0.05 && eK < 0.05) { b.className = "banner ok"; b.innerHTML = "<b>Constants recovered</b>Both are within 5% of the hidden values, found from noisy data alone."; }
+    else { b.className = "banner"; b.innerHTML = "<b>Searching</b>Adjusting μ and k until the curve fits the data and obeys the equation."; }
+    const tag = e => e < 0.05 ? `<span class="pill ok">within ${pct(e)}</span>` : `<span class="pill">off by ${pct(e)}</span>`;
+    $("e2-readout").innerHTML = `
+      <div class="row"><span class="c-nn">Damping μ</span><span class="v">${mu.toFixed(2)} <span style="color:var(--muted)">/ ${this.P.mu.toFixed(1)}</span> ${tag(eMu)}</span></div>
+      <div class="row"><span class="c-pinn">Stiffness k</span><span class="v">${k.toFixed(1)} <span style="color:var(--muted)">/ ${this.P.k}</span> ${tag(eK)}</span></div>
+      <div class="row"><span>Data loss · physics loss</span><span class="v">${isNaN(this.last.ld) ? "–" : fmtE(this.last.ld) + " · " + fmtE(this.last.lp)}</span></div>`;
+  },
+};
+
+/* ======================================================================
+   Live results strip
+   ====================================================================== */
+function updateStrip() {
+  if (active !== "extrapolate") E1.measure();
+  if (!isNaN(E1.ePI)) { $("st-pinn").textContent = pct(E1.ePI); $("st-nn").textContent = pct(E1.eNN); }
+  if (E2.step > 0) {
+    const { eK } = E2.errors();
+    $("st-k").textContent = E2.k(E2.net).toFixed(0);
+    $("st-k").className = "v " + (eK < 0.05 ? "c-good" : "c-pinn");
+    $("st-k-s").textContent = `true value ${E2.P.k} · ${eK < 0.05 ? "within " + pct(eK) : "searching…"}`;
+  }
+}
+
+/* ======================================================================
+   Wiring
+   ====================================================================== */
+const EXPS = { extrapolate: E1, discover: E2 };
+let active = "extrapolate";
+
+function selectTab(name) {
+  active = name;
+  for (const k of Object.keys(EXPS)) {
+    $("tab-" + k).setAttribute("aria-selected", k === name ? "true" : "false");
+    $("panel-" + k).hidden = k !== name;
+  }
+  EXPS[name].uiAt = 0;
+}
+for (const k of Object.keys(EXPS)) {
+  $("tab-" + k).addEventListener("click", () => { selectTab(k); try { history.replaceState(null, "", "#" + k); } catch (e) {} });
+}
+
+for (const [pre, E] of [["e1", E1], ["e2", E2]]) {
+  $(pre + "-toggle").addEventListener("click", () => {
+    if (E.done) { E.done = false; E.limit += 10000; }
+    E.setRunning(!E.running);
+    E.uiAt = 0;
+  });
+  $(pre + "-reset").addEventListener("click", () => E.reset());
+  document.querySelectorAll(`input[id^="${pre}-"]`).forEach(inp => inp.addEventListener("input", () => E.reset()));
+}
+
+let frame = 0;
+function loop(now) {
+  // Both experiments keep training; the visible one gets the larger share of each frame.
+  for (const k of Object.keys(EXPS)) {
+    const E = EXPS[k];
+    if (E.running) E.tick(k === active ? 8 : 3);
+  }
+  if (!reducedMotion) {
+    const u = (now % CYCLE_MS) / CYCLE_MS * 1.15;
+    playT = Math.min(1, u);
+  }
+  if (active === "extrapolate") E1.draw(); else E2.draw();
+  drawStage();
+  if (++frame % 10 === 0) updateStrip();
+  requestAnimationFrame(loop);
+}
+
+function redrawAll() { readTheme(); E1.uiAt = 0; E2.uiAt = 0; }
+new ResizeObserver(() => { E1.uiAt = 0; E2.uiAt = 0; }).observe(document.querySelector(".wrap"));
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redrawAll); } catch (e) {}
+new MutationObserver(redrawAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+E1.reset();
+E2.reset();
+if (location.hash === "#discover") selectTab("discover");
+requestAnimationFrame(loop);
+
+setTimeout(() => {
+  const r = gradCheck();
+  const pass = r.maxRel < 1e-5;
+  $("gradcheck").innerHTML = `Gradient check: ${r.n} parameters<br>max relative error <span class="c-pinn">${r.maxRel.toExponential(1)}</span> ${pass ? '<span class="pill ok">pass</span>' : '<span class="pill">fail</span>'}`;
+  $("st-grad").textContent = r.maxRel.toExponential(0);
+}, 300);
+</script>
